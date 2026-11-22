@@ -12,15 +12,21 @@ echo.
 :: 1. Detect Antigravity .gemini Path
 set "TARGET_DIR="
 
-if defined GEMINI_HOME if exist "%GEMINI_HOME%" (
-    set "TARGET_DIR=%GEMINI_HOME%"
-)
-if not defined TARGET_DIR if defined ANTIGRAVITY_HOME if exist "%ANTIGRAVITY_HOME%" (
-    set "TARGET_DIR=%ANTIGRAVITY_HOME%"
-)
-if not defined TARGET_DIR (
-    set "TARGET_DIR=%USERPROFILE%\.gemini"
-)
+:: Check explicit environment overrides
+if defined GEMINI_HOME if exist "%GEMINI_HOME%" set "TARGET_DIR=%GEMINI_HOME%"
+if not defined TARGET_DIR if defined ANTIGRAVITY_HOME if exist "%ANTIGRAVITY_HOME%" set "TARGET_DIR=%ANTIGRAVITY_HOME%"
+
+:: Check standard user profile path
+if not defined TARGET_DIR if exist "%USERPROFILE%\.gemini" set "TARGET_DIR=%USERPROFILE%\.gemini"
+
+:: Check alternate drive or system roots
+if not defined TARGET_DIR if exist "%HOMEDRIVE%%HOMEPATH%\.gemini" set "TARGET_DIR=%HOMEDRIVE%%HOMEPATH%\.gemini"
+
+:: Check AppData Roaming / Local Antigravity if customized
+if not defined TARGET_DIR if exist "%APPDATA%\.gemini" set "TARGET_DIR=%APPDATA%\.gemini"
+
+:: Default fallback is standard %USERPROFILE%\.gemini
+if not defined TARGET_DIR set "TARGET_DIR=%USERPROFILE%\.gemini"
 
 echo [*] Resolved Antigravity path: "!TARGET_DIR!"
 
@@ -28,12 +34,8 @@ echo [*] Resolved Antigravity path: "!TARGET_DIR!"
 set "ZIP_NAME=ritmada_core_bundle.zip"
 set "BUNDLE_PATH=%~dp0%ZIP_NAME%"
 
-if not exist "!BUNDLE_PATH!" (
-    set "BUNDLE_PATH=%USERPROFILE%\Desktop\%ZIP_NAME%"
-)
-if not exist "!BUNDLE_PATH!" (
-    set "BUNDLE_PATH=%CD%\%ZIP_NAME%"
-)
+if not exist "!BUNDLE_PATH!" set "BUNDLE_PATH=%USERPROFILE%\Desktop\%ZIP_NAME%"
+if not exist "!BUNDLE_PATH!" set "BUNDLE_PATH=%CD%\%ZIP_NAME%"
 
 if not exist "!BUNDLE_PATH!" (
     color 0C
@@ -43,7 +45,7 @@ if not exist "!BUNDLE_PATH!" (
     echo         - "%USERPROFILE%\Desktop"
     echo         - "%CD%"
     echo.
-    echo Please place "!ZIP_NAME!" in the same directory as this script.
+    echo Please ensure "!ZIP_NAME!" is in the same directory as this script.
     echo.
     pause
     exit /b 1
@@ -71,7 +73,8 @@ if exist "!TARGET_DIR!" (
     if exist "!TARGET_DIR!\rules" rmdir /s /q "!TARGET_DIR!\rules" >nul 2>&1
     if exist "!TARGET_DIR!\domains" rmdir /s /q "!TARGET_DIR!\domains" >nul 2>&1
     if exist "!TARGET_DIR!\references" rmdir /s /q "!TARGET_DIR!\references" >nul 2>&1
-    if exist "!TARGET_DIR!\config" rmdir /s /q "!TARGET_DIR!\config" >nul 2>&1
+    if exist "!TARGET_DIR!\config\plugins" rmdir /s /q "!TARGET_DIR!\config\plugins" >nul 2>&1
+    if exist "!TARGET_DIR!\config\skills" rmdir /s /q "!TARGET_DIR!\config\skills" >nul 2>&1
     echo [+] Old configuration wiped cleanly.
 ) else (
     echo [*] Target directory does not exist. Initializing "!TARGET_DIR!"...
@@ -98,7 +101,7 @@ if "!EXTRACT_OK!"=="0" (
 if "!EXTRACT_OK!"=="0" (
     color 0C
     echo.
-    echo [ERROR] Failed to extract archive into "!TARGET_DIR!".
+    echo [ERROR] Failed to extract archive bundle.
     pause
     exit /b 1
 )
@@ -106,30 +109,47 @@ if "!EXTRACT_OK!"=="0" (
 echo [+] Extraction complete.
 echo.
 
-:: 5. Verification
-if not exist "!TARGET_DIR!\GEMINI.md" goto :FAIL
-if not exist "!TARGET_DIR!\rules\GEMINI.md" goto :FAIL
-if not exist "!TARGET_DIR!\domains" goto :FAIL
+:: 5. Verification Phase
+echo [*] Verifying deployment integrity...
+set "VERIFY_FAILED=0"
 
-color 0A
+if not exist "!TARGET_DIR!\GEMINI.md" (
+    echo [!] Missing: GEMINI.md
+    set "VERIFY_FAILED=1"
+)
+if not exist "!TARGET_DIR!\rules\GEMINI.md" (
+    echo [!] Missing: rules\GEMINI.md
+    set "VERIFY_FAILED=1"
+)
+if not exist "!TARGET_DIR!\domains\systems.md" (
+    echo [!] Missing: domains\systems.md
+    set "VERIFY_FAILED=1"
+)
+if not exist "!TARGET_DIR!\config\config.json" (
+    echo [!] Missing: config\config.json
+    set "VERIFY_FAILED=1"
+)
+if not exist "!TARGET_DIR!\config\skills" (
+    echo [!] Missing: config\skills directory
+    set "VERIFY_FAILED=1"
+)
+
+if "!VERIFY_FAILED!"=="1" (
+    color 0C
+    echo.
+    echo [WARNING] Verification detected missing critical components.
+    echo           Check archive bundle integrity.
+    pause
+    exit /b 1
+)
+
+echo [+] All core modules, rules, and skills successfully deployed and verified.
+echo.
 echo ===============================================================================
-echo   [SUCCESS] Ritmada Core v2.5 UNBOUND deployed and verified.
-echo ===============================================================================
-echo   - Target Path:    "!TARGET_DIR!"
-echo   - Core Spec:      "!TARGET_DIR!\GEMINI.md"
-echo   - Rules Engine:   "!TARGET_DIR!\rules\GEMINI.md"
-echo   - Domains:        "!TARGET_DIR!\domains\" (6 runbooks)
-echo   - Skills Suite:   "!TARGET_DIR!\config\skills\" (24 skills)
-echo   - Backup Saved:   "!BACKUP_DIR!"
+echo   [SUCCESS] RITMADA CORE v2.5 INSTALLED INTO !TARGET_DIR!
 echo ===============================================================================
 echo.
-echo Deployment finished successfully. Press any key to exit.
-pause >nul
-exit /b 0
-
-:FAIL
-color 0C
+echo Restart Antigravity to load the newly installed skills and system parameters.
 echo.
-echo [ERROR] Verification failed. Missing essential files in "!TARGET_DIR!".
 pause
-exit /b 1
+exit /b 0
